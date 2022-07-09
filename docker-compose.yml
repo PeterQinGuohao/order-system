@@ -1,0 +1,117 @@
+version: '3'
+services:
+
+  zookeeper:
+    image: wurstmeister/zookeeper:3.4.6
+  kafka:
+    image: wurstmeister/kafka:2.12-2.3.0
+    depends_on:
+      - zookeeper
+    environment:
+      KAFKA_ADVERTISED_HOST_NAME: kafka
+      KAFKA_ADVERTISED_PORT: 9092
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+
+  mongo-orders:
+    image: bitnami/mongodb:latest
+    environment:
+      MONGODB_USERNAME: dbuser
+      MONGODB_PASSWORD: dbpassword
+      MONGODB_DATABASE: orders
+  order-service:
+    build:
+      context: ./order-service
+      dockerfile: Dockerfile.dev
+    depends_on:
+      - kafka
+      - mongo-orders
+    environment:
+      MONGO_HOST: mongo-orders
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+
+  mongo-warehouse:
+    image: bitnami/mongodb:latest
+    environment:
+      MONGODB_USERNAME: dbuser
+      MONGODB_PASSWORD: dbpassword
+      MONGODB_DATABASE: warehouse
+  mongo-warehouse-seed:
+    build: ./db/warehouse
+    depends_on:
+      - mongo-warehouse
+  warehouse-service:
+    build:
+      context: ./warehouse-service
+      dockerfile: Dockerfile.dev
+    depends_on:
+      - kafka
+      - mongo-warehouse
+    environment:
+      MONGO_HOST: mongo-warehouse
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+
+  mongo-customer:
+    image: bitnami/mongodb:latest
+    environment:
+      MONGODB_USERNAME: dbuser
+      MONGODB_PASSWORD: dbpassword
+      MONGODB_DATABASE: customer
+  mongo-customer-seed:
+    build: ./db/customer
+    depends_on:
+      - mongo-customer
+  customer-service:
+    build:
+      context: ./customer-service
+      dockerfile: Dockerfile.dev
+    depends_on:
+      - mongo-customer
+    environment:
+      MONGO_HOST: mongo-customer
+
+  mongo-catalogue:
+    image: bitnami/mongodb:latest
+    environment:
+      MONGODB_USERNAME: dbuser
+      MONGODB_PASSWORD: dbpassword
+      MONGODB_DATABASE: catalogue
+  mongo-catalogue-seed:
+    build: ./db/catalogue
+    depends_on:
+      - mongo-catalogue
+  catalogue-service:
+    build:
+      context: ./catalogue-service
+      dockerfile: Dockerfile.dev
+    depends_on:
+      - mongo-catalogue
+    environment:
+      MONGO_HOST: mongo-catalogue
+
+  mongo-finance:
+    image: bitnami/mongodb:latest
+    environment:
+      MONGODB_USERNAME: dbuser
+      MONGODB_PASSWORD: dbpassword
+      MONGODB_DATABASE: finance
+  finance-finance:
+    build:
+      context: ./finance-service
+      dockerfile: Dockerfile.dev
+    depends_on:
+      - kafka
+      - mongo-finance
+    environment:
+      MONGO_HOST: mongo-finance
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      CATALOGUE_SERVICE_URI: catalogue-service
+
+  notification-finance:
+    build:
+      context: ./notification-service
+      dockerfile: Dockerfile.dev
+    depends_on:
+      - kafka
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      CUSTOMER_SERVICE_URI: customer-service
